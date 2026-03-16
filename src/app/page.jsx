@@ -240,8 +240,8 @@ export default function Home() {
           {/* Quick stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 border-t border-gray-300 pt-8">
             {[
-              { label: 'Agents Benchmarked', value: mode === 'live' ? '100' : '1,000' },
-              { label: 'Simulation Rounds', value: mode === 'live' ? '30' : '50' },
+              { label: 'Agents Benchmarked', value: '1,000' },
+              { label: 'Simulation Rounds', value: '50' },
               { label: 'Facts Per Agent', value: '10' },
               { label: mode === 'live' ? 'Mode' : 'Clude Hallucination', value: mode === 'live' ? '🔴 PRODUCTION' : '1%' },
             ].map((stat) => (
@@ -264,7 +264,38 @@ export default function Home() {
           >
             {/* Progress bar */}
             {simRunning && (
-              <div className="mb-8 bg-white rounded-xl p-4 border border-border">
+              <div className="mb-8 bg-white rounded-xl p-5 border border-border">
+                {/* Phase steps */}
+                {mode === 'live' && progress.round === 0 && (
+                  <div className="flex items-center gap-6 mb-4">
+                    {[
+                      { key: 'embedding', label: 'Embed' },
+                      { key: 'seeding', label: 'Check' },
+                      { key: 'storing', label: 'Seed' },
+                      { key: 'running', label: 'Simulate' },
+                    ].map((step, i) => {
+                      const currentPhase = statusMsg.toLowerCase()
+                      const phases = ['embed', 'check', 'stor', 'running']
+                      const activeIdx = phases.findIndex(p => currentPhase.includes(p))
+                      const isDone = i < activeIdx
+                      const isActive = i === activeIdx
+                      return (
+                        <div key={step.key} className="flex items-center gap-2">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono ${
+                            isDone ? 'bg-clude text-white' : isActive ? 'bg-clude/20 text-clude animate-pulse' : 'bg-[#fafaf8] text-muted/40'
+                          }`}>
+                            {isDone ? '✓' : i + 1}
+                          </div>
+                          <span className={`text-[11px] font-mono ${isActive ? 'text-clude' : isDone ? 'text-dark' : 'text-muted/40'}`}>
+                            {step.label}
+                          </span>
+                          {i < 3 && <span className="text-muted/20 ml-2">→</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-clude rounded-full animate-pulse" />
@@ -283,12 +314,16 @@ export default function Home() {
                     {progress.round > 0 ? `${Math.round((progress.round / progress.total) * 100)}%` : ''}
                   </span>
                 </div>
-                <div className="w-full bg-[#fafaf8] rounded-full h-1.5">
-                  <motion.div
-                    className="bg-gradient-to-r from-clude to-blue-400 h-1.5 rounded-full"
-                    animate={{ width: progress.round > 0 ? `${(progress.round / progress.total) * 100}%` : '5%' }}
-                    transition={{ duration: 0.3 }}
-                  />
+                <div className="w-full bg-[#fafaf8] rounded-full h-1.5 overflow-hidden">
+                  {progress.round > 0 ? (
+                    <motion.div
+                      className="bg-gradient-to-r from-clude to-blue-400 h-1.5 rounded-full"
+                      animate={{ width: `${(progress.round / progress.total) * 100}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  ) : (
+                    <div className="h-1.5 w-full animate-shimmer rounded-full" />
+                  )}
                 </div>
               </div>
             )}

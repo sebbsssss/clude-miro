@@ -2,7 +2,7 @@ import { runLiveSimulation } from '../../../lib/live-simulation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // 5 min timeout for Vercel
+export const maxDuration = 900 // 15 min timeout (Vercel Pro)
 
 export async function POST(request) {
   const encoder = new TextEncoder()
@@ -14,7 +14,7 @@ export async function POST(request) {
       }
 
       try {
-        const results = await runLiveSimulation(100, 30, send)
+        const results = await runLiveSimulation(1000, 50, send)
         send({ type: 'complete', results })
       } catch (err) {
         send({ type: 'error', message: err.message })
