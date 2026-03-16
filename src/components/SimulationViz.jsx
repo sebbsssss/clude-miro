@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 
-export default function SimulationViz({ metrics, color, running }) {
+export default function SimulationViz({ metrics, color, running, costLabel }) {
   const m = metrics || { hallucinations: 0, factRetention: 100, cost: 0 }
   const { hallucinations, factRetention, cost } = m
 
@@ -63,9 +63,11 @@ export default function SimulationViz({ metrics, color, running }) {
           </p>
         </div>
         <div className="rounded-xl p-3 text-center" style={{ background: `${color}0a` }}>
-          <p className="text-[10px] font-mono tracking-wider text-gray-400 mb-1">COST</p>
+          <p className="text-[10px] font-mono tracking-wider text-gray-400 mb-1">
+            {costLabel || 'COST'}
+          </p>
           <p className="text-xl font-bold" style={{ color }}>
-            {cost >= 1000 ? `$${(cost / 1000).toFixed(0)}K` : `$${cost.toFixed(0)}`}
+            {cost >= 1000 ? `$${(cost / 1000).toFixed(1)}K` : `$${cost.toFixed(0)}`}
           </p>
         </div>
       </div>

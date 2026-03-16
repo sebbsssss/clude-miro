@@ -22,7 +22,7 @@ function MetricRow({ label, defaultVal, vikingVal, cludeVal, unit = '', highligh
   )
 }
 
-export default function MetricsPanel({ defaultMetrics, vikingMetrics, cludeMetrics, running }) {
+export default function MetricsPanel({ defaultMetrics, vikingMetrics, cludeMetrics, running, isLive }) {
   const d = defaultMetrics
   const v = vikingMetrics || { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 }
   const c = cludeMetrics
@@ -48,7 +48,7 @@ export default function MetricsPanel({ defaultMetrics, vikingMetrics, cludeMetri
       <MetricRow label="Hallucination Rate" defaultVal={d.hallucinations} vikingVal={v.hallucinations} cludeVal={c.hallucinations} unit="%" highlight />
       <MetricRow label="Fact Retention" defaultVal={d.factRetention} vikingVal={v.factRetention} cludeVal={c.factRetention} unit="%" />
       <MetricRow label="Prediction Accuracy" defaultVal={predAccDefault} vikingVal={predAccViking} cludeVal={predAccClude} unit="%" />
-      <MetricRow label="Cost Per Round" defaultVal={d.cost} vikingVal={v.cost} cludeVal={c.cost} unit="" highlight />
+      <MetricRow label={isLive ? "Cost (projected vs actual)" : "Cost Per Round"} defaultVal={d.cost} vikingVal={v.cost} cludeVal={c.cost} unit="" highlight />
 
       {running && (
         <div className="mt-4 flex items-center gap-2">

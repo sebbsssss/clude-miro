@@ -213,7 +213,7 @@ export default function Home() {
                   <h3 className="font-mono text-xs tracking-wider text-gray-500">DEFAULT</h3>
                 </div>
                 <p className="text-[11px] text-gray-400 mb-4 ml-4">Context window stuffing · $0.25/query</p>
-                <SimulationViz metrics={liveMetrics.default} color="#ef4444" running={simRunning} />
+                <SimulationViz metrics={liveMetrics.default} color="#ef4444" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED COST' : 'COST'} />
               </div>
 
               {/* OpenViking */}
@@ -224,7 +224,7 @@ export default function Home() {
                   <span className="text-[9px] font-mono bg-orange-50 text-orange-400 px-1.5 py-0.5 rounded">BYTEDANCE</span>
                 </div>
                 <p className="text-[11px] text-gray-400 mb-4 ml-4">Filesystem paradigm · $0.05/query</p>
-                <SimulationViz metrics={liveMetrics.viking} color="#f59e0b" running={simRunning} />
+                <SimulationViz metrics={liveMetrics.viking} color="#f59e0b" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED COST' : 'COST'} />
               </div>
 
               {/* Clude */}
@@ -240,7 +240,7 @@ export default function Home() {
                   <span className="text-[9px] font-mono bg-blue-50 text-clude px-1.5 py-0.5 rounded">WINNER</span>
                 </div>
                 <p className="text-[11px] text-gray-400 mb-4 ml-4">Cognitive vector retrieval · $0.001/query</p>
-                <SimulationViz metrics={liveMetrics.clude} color="#455cfa" running={simRunning} />
+                <SimulationViz metrics={liveMetrics.clude} color="#455cfa" running={simRunning} costLabel={mode === 'live' ? 'ACTUAL COST' : 'COST'} />
               </div>
             </div>
 
@@ -250,6 +250,7 @@ export default function Home() {
               vikingMetrics={liveMetrics.viking}
               cludeMetrics={liveMetrics.clude}
               running={simRunning}
+              isLive={mode === 'live'}
             />
           </motion.section>
         )}

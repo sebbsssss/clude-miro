@@ -136,17 +136,23 @@ async function judgeAnswersBatch(tasks) {
             max_tokens: 100,
             temperature: 0,
             messages: [
-              { role: 'system', content: 'Answer the question using ONLY the provided memories. If the answer is not in the memories, say "UNKNOWN". Be concise.' },
-              { role: 'user', content: `Memories:\n${memText}\n\nQuestion: ${question}\nAnswer:` },
+              { role: 'system', content: `You are judging if a memory system recalled the right information.
+Given memories and a question, determine if the expected answer is present in the memories.
+Reply ONLY with one word: CORRECT, WRONG, or UNKNOWN.
+- CORRECT: The memories contain information that answers the question (even if phrased differently or with extra context)
+- WRONG: The memories contain a confident but INCORRECT answer
+- UNKNOWN: The memories don't contain relevant information` },
+              { role: 'user', content: `Memories:\n${memText}\n\nQuestion: ${question}\nExpected answer: ${expectedAnswer}\n\nVerdict:` },
             ],
           }),
         })
         if (!resp.ok) return { correct: false, hallucinated: false }
         const data = await resp.json()
-        const answer = data.choices[0].message.content.trim()
-        const isUnknown = answer.toLowerCase().includes('unknown')
-        const containsExpected = answer.toLowerCase().includes(expectedAnswer.toLowerCase())
-        return { correct: containsExpected, hallucinated: !isUnknown && !containsExpected }
+        const verdict = data.choices[0].message.content.trim().toUpperCase()
+        return {
+          correct: verdict.includes('CORRECT'),
+          hallucinated: verdict.includes('WRONG'),
+        }
       } catch {
         return { correct: false, hallucinated: false }
       }
