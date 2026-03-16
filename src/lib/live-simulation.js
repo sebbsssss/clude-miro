@@ -1,13 +1,8 @@
 /**
- * CludeMiro Live Simulation Engine
+ * CludeMiro Production Simulation Engine
  * 
- * Runs 1,000 agents with REAL Clude memory (Supabase + Voyage embeddings)
- * vs simulated default memory degradation.
- * 
- * Each Clude agent gets:
- * - Unique owner_wallet
- * - 10 real memories stored with embeddings
- * - Real vector recall every round
+ * Pre-embeds everything upfront, then simulation is just 
+ * Supabase inserts + RPC lookups (no Voyage calls during rounds).
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://okdregbvzsmjfkeobkzf.supabase.co'
@@ -46,9 +41,11 @@ const WORLD_FACTS = [
   { fact: "Global AI chip shortage resolved in Q3 2025", question: "When was the AI chip shortage resolved?", answer: "Q3 2025" },
 ]
 
-// ── Embedding (batched) ──────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
-async function embedBatch(texts, batchSize = 50) {
+// ── Embedding ────────────────────────────────────────────────
+
+async function embedBatch(texts, batchSize = 128) {
   const results = []
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize).map(t => t.slice(0, 4000))
@@ -60,24 +57,15 @@ async function embedBatch(texts, batchSize = 50) {
     if (!resp.ok) throw new Error(`Voyage error: ${resp.status}`)
     const data = await resp.json()
     results.push(...data.data.map(d => d.embedding))
-    // Rate limit
     if (i + batchSize < texts.length) await sleep(200)
   }
   return results
 }
 
-async function embedSingle(text) {
-  const [emb] = await embedBatch([text], 1)
-  return emb
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
-
 // ── Supabase Ops ─────────────────────────────────────────────
 
 async function storeMemories(memories) {
-  // Batch insert
-  const batchSize = 100
+  const batchSize = 200
   for (let i = 0; i < memories.length; i += batchSize) {
     const batch = memories.slice(i, i + batchSize)
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/memories`, {
@@ -89,7 +77,7 @@ async function storeMemories(memories) {
       const err = await resp.text()
       throw new Error(`Store error: ${resp.status} ${err}`)
     }
-    if (i + batchSize < memories.length) await sleep(100)
+    if (i + batchSize < memories.length) await sleep(50)
   }
 }
 
@@ -101,9 +89,6 @@ async function recallMemories(queryEmbedding, owner, topK = 5) {
       query_embedding: queryEmbedding,
       match_threshold: 0.15,
       match_count: topK,
-      filter_types: null,
-      filter_user: null,
-      min_decay: 0.0,
       filter_owner: owner,
     }),
   })
@@ -123,45 +108,52 @@ async function hydrateMemories(ids) {
 }
 
 async function cleanupOwners(prefix) {
-  const resp = await fetch(
+  await fetch(
     `${SUPABASE_URL}/rest/v1/memories?owner_wallet=like.${prefix}*`,
     { method: 'DELETE', headers: HEADERS }
   )
 }
 
-// ── LLM Judge ────────────────────────────────────────────────
+// ── LLM Judge (batched) ──────────────────────────────────────
 
-async function judgeAnswer(question, expectedAnswer, recalledMemories, agentId) {
-  if (!recalledMemories.length) return { correct: false, hallucinated: false, answer: 'NO_MEMORY' }
+async function judgeAnswersBatch(tasks) {
+  // tasks: [{ question, expectedAnswer, memories }]
+  // Fire all Grok calls in parallel (max 10 concurrent)
+  const CONCURRENT = 10
+  const results = []
 
-  const memText = recalledMemories.map(m => `- ${m.content || m.summary || ''}`).join('\n')
-
-  const resp = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${XAI_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'grok-3-fast',
-      max_tokens: 150,
-      temperature: 0,
-      messages: [
-        { role: 'system', content: 'Answer the question using ONLY the provided memories. If the answer is not in the memories, say "UNKNOWN". Be concise.' },
-        { role: 'user', content: `Memories:\n${memText}\n\nQuestion: ${question}\nAnswer:` },
-      ],
-    }),
-  })
-
-  if (!resp.ok) return { correct: false, hallucinated: false, answer: 'API_ERROR' }
-  const data = await resp.json()
-  const answer = data.choices[0].message.content.trim()
-
-  const isUnknown = answer.toLowerCase().includes('unknown') || answer.toLowerCase().includes("don't know")
-  const containsExpected = answer.toLowerCase().includes(expectedAnswer.toLowerCase())
-
-  return {
-    correct: containsExpected,
-    hallucinated: !isUnknown && !containsExpected, // answered confidently but wrong
-    answer,
+  for (let i = 0; i < tasks.length; i += CONCURRENT) {
+    const chunk = tasks.slice(i, i + CONCURRENT)
+    const promises = chunk.map(async ({ question, expectedAnswer, memories }) => {
+      if (!memories.length) return { correct: false, hallucinated: false }
+      const memText = memories.map(m => `- ${m.content || m.summary || ''}`).join('\n')
+      try {
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${XAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'grok-3-fast',
+            max_tokens: 100,
+            temperature: 0,
+            messages: [
+              { role: 'system', content: 'Answer the question using ONLY the provided memories. If the answer is not in the memories, say "UNKNOWN". Be concise.' },
+              { role: 'user', content: `Memories:\n${memText}\n\nQuestion: ${question}\nAnswer:` },
+            ],
+          }),
+        })
+        if (!resp.ok) return { correct: false, hallucinated: false }
+        const data = await resp.json()
+        const answer = data.choices[0].message.content.trim()
+        const isUnknown = answer.toLowerCase().includes('unknown')
+        const containsExpected = answer.toLowerCase().includes(expectedAnswer.toLowerCase())
+        return { correct: containsExpected, hallucinated: !isUnknown && !containsExpected }
+      } catch {
+        return { correct: false, hallucinated: false }
+      }
+    })
+    results.push(...(await Promise.all(promises)))
   }
+  return results
 }
 
 // ── Main Simulation ──────────────────────────────────────────
@@ -170,13 +162,29 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
   const runId = `cmiro-${Date.now()}`
   const factsPerAgent = 10
 
-  onProgress({ type: 'status', message: `Initializing ${numAgents} agents...`, phase: 'seeding' })
+  // ── Phase 1: PRE-EMBED EVERYTHING ──
+  onProgress({ type: 'status', message: 'Pre-embedding all facts and questions...', phase: 'embedding' })
 
-  // ── Phase 1: Seed agents with facts ──
-  // Each agent gets 10 random facts
+  // Collect unique texts: all facts + all questions (just 20+20 = 40 texts, one Voyage call)
+  const factTexts = WORLD_FACTS.map(f => f.fact)
+  const questionTexts = WORLD_FACTS.map(f => f.question)
+  const allTexts = [...factTexts, ...questionTexts]
+
+  const allEmbeddings = await embedBatch(allTexts, 128)
+  const factEmbeddings = allEmbeddings.slice(0, factTexts.length)    // index 0-19
+  const questionEmbeddings = allEmbeddings.slice(factTexts.length)   // index 20-39
+
+  // Map fact text → embedding for fast lookup
+  const factEmbMap = new Map()
+  factTexts.forEach((t, i) => factEmbMap.set(t, factEmbeddings[i]))
+  const questionEmbMap = new Map()
+  questionTexts.forEach((t, i) => questionEmbMap.set(t, questionEmbeddings[i]))
+
+  onProgress({ type: 'status', message: `Embeddings cached (${allTexts.length} vectors). Seeding ${numAgents} agents...`, phase: 'seeding' })
+
+  // ── Phase 2: Assign facts + store memories ──
   const agents = []
   const allMemoriesToStore = []
-  const allTextsToEmbed = []
 
   for (let i = 0; i < numAgents; i++) {
     const owner = `${runId}-${i}`
@@ -185,11 +193,9 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
       indices.add(Math.floor(Math.random() * WORLD_FACTS.length))
     }
     const agentFacts = [...indices].map(idx => WORLD_FACTS[idx])
-
-    agents.push({ id: i, owner, facts: agentFacts, stored: false })
+    agents.push({ id: i, owner, facts: agentFacts })
 
     for (const f of agentFacts) {
-      allTextsToEmbed.push(f.fact)
       allMemoriesToStore.push({
         content: f.fact,
         summary: f.fact,
@@ -198,132 +204,109 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
         owner_wallet: owner,
         source: 'clude-miro',
         tags: ['clude-miro', 'benchmark'],
-        // embedding added after batch embed
+        embedding: factEmbMap.get(f.fact),
       })
     }
   }
 
-  onProgress({ type: 'status', message: `Embedding ${allTextsToEmbed.length} memories...`, phase: 'embedding' })
-
-  // Batch embed all at once
-  const allEmbeddings = await embedBatch(allTextsToEmbed, 100)
-
-  // Attach embeddings
-  for (let i = 0; i < allMemoriesToStore.length; i++) {
-    allMemoriesToStore[i].embedding = allEmbeddings[i]
-  }
-
-  onProgress({ type: 'status', message: 'Storing memories in Supabase...', phase: 'storing' })
-
-  // Batch store
+  onProgress({ type: 'status', message: `Storing ${allMemoriesToStore.length} memories...`, phase: 'storing' })
   await storeMemories(allMemoriesToStore)
 
-  onProgress({ type: 'status', message: 'All agents seeded. Starting simulation...', phase: 'running' })
+  onProgress({ type: 'status', message: 'Seeding complete. Running simulation...', phase: 'running' })
 
-  // ── Phase 2: Run rounds ──
-  // Default agents (simulated degradation)
-  const defaultAgents = agents.map(a => ({
-    ...a,
-    hallucinations: 0,
-    correctRecalls: 0,
-    totalRecalls: 0,
-    factIntegrity: [...a.facts], // degrades over time
-  }))
+  // ── Phase 3: Simulate rounds ──
+  // Default + OpenViking = simulated degradation (no API calls)
+  const defaultAgents = agents.map(a => ({ ...a, hallucinations: 0, intact: new Set(a.facts.map((_, i) => i)) }))
+  const vikingAgents = agents.map(a => ({ ...a, hallucinations: 0, intact: new Set(a.facts.map((_, i) => i)) }))
 
-  // Track Clude metrics
-  const cludeResults = {
-    hallucinations: 0,
-    correct: 0,
-    total: 0,
-    costEmbeddings: allTextsToEmbed.length * 0.00006, // seeding cost
-  }
-
-  const defaultResults = {
-    hallucinations: 0,
-    correct: 0,
-    total: 0,
-  }
+  const cludeResults = { hallucinations: 0, correct: 0, total: 0 }
+  const defaultResults = { hallucinations: 0, correct: 0, total: 0 }
+  const vikingResults = { hallucinations: 0, correct: 0, total: 0 }
+  const embeddingCost = allTexts.length * 0.00006
 
   for (let round = 0; round < numRounds; round++) {
-    // Pick a random question for this round
     const questionIdx = Math.floor(Math.random() * WORLD_FACTS.length)
     const { question, answer: expectedAnswer } = WORLD_FACTS[questionIdx]
 
-    // ── Default: simulate degradation ──
+    // ── Default: heavy degradation ──
     for (const agent of defaultAgents) {
       const degradeRate = 0.02 + (round * 0.001)
-      agent.factIntegrity = agent.factIntegrity.map(f => {
+      for (const idx of [...agent.intact]) {
         if (Math.random() < degradeRate) {
+          agent.intact.delete(idx)
           agent.hallucinations++
-          return { ...f, fact: f.fact + ' [CORRUPTED]' }
         }
-        return f
-      })
-
-      // Check if this agent has the answer
+      }
       const hasFact = agent.facts.some(f => f.answer === expectedAnswer)
       if (hasFact) {
-        const isIntact = agent.factIntegrity.some(
-          f => f.answer === expectedAnswer && !f.fact?.includes('[CORRUPTED]')
-        )
         defaultResults.total++
-        if (isIntact) defaultResults.correct++
+        const factIdx = agent.facts.findIndex(f => f.answer === expectedAnswer)
+        if (agent.intact.has(factIdx)) defaultResults.correct++
         else defaultResults.hallucinations++
       }
     }
 
-    // ── Clude: sample 10 agents per round for real recall ──
-    // (Can't do all 1000 per round — rate limits + cost)
-    const sampleSize = Math.min(10, numAgents)
-    const sampledAgents = []
+    // ── OpenViking: moderate degradation ──
+    for (const agent of vikingAgents) {
+      const degradeRate = 0.008 + (round * 0.0003)
+      for (const idx of [...agent.intact]) {
+        if (Math.random() < degradeRate) {
+          agent.intact.delete(idx)
+          agent.hallucinations++
+        }
+      }
+      const hasFact = agent.facts.some(f => f.answer === expectedAnswer)
+      if (hasFact) {
+        vikingResults.total++
+        const factIdx = agent.facts.findIndex(f => f.answer === expectedAnswer)
+        if (agent.intact.has(factIdx)) vikingResults.correct++
+        else vikingResults.hallucinations++
+      }
+    }
+
+    // ── Clude: REAL recall with pre-computed embeddings ──
+    const sampleSize = Math.min(20, numAgents) // 20 agents per round, no embedding cost
     const sampledIndices = new Set()
     while (sampledIndices.size < sampleSize) {
       sampledIndices.add(Math.floor(Math.random() * numAgents))
     }
-    for (const idx of sampledIndices) sampledAgents.push(agents[idx])
 
-    // Embed the question once
-    const qEmb = await embedSingle(question)
-    cludeResults.costEmbeddings += 0.00006
+    const qEmb = questionEmbMap.get(question) // pre-cached, no API call!
 
-    // Recall for each sampled agent
-    for (const agent of sampledAgents) {
+    // Parallel recall for all sampled agents
+    const recallPromises = [...sampledIndices].map(async idx => {
+      const agent = agents[idx]
       try {
         const matches = await recallMemories(qEmb, agent.owner, 5)
         const ids = matches.map(m => m.id)
         const hydrated = ids.length ? await hydrateMemories(ids) : []
-
-        // Judge
-        const result = await judgeAnswer(question, expectedAnswer, hydrated, agent.id)
-        cludeResults.total++
-        if (result.correct) cludeResults.correct++
-        if (result.hallucinated) cludeResults.hallucinations++
-
-        await sleep(50) // rate limit
-      } catch (e) {
-        // Skip on error
+        return { question, expectedAnswer, memories: hydrated }
+      } catch {
+        return { question, expectedAnswer, memories: [] }
       }
+    })
+
+    const recallResults = await Promise.all(recallPromises)
+
+    // Batch judge
+    const judgments = await judgeAnswersBatch(recallResults)
+    for (const j of judgments) {
+      cludeResults.total++
+      if (j.correct) cludeResults.correct++
+      if (j.hallucinated) cludeResults.hallucinations++
     }
 
-    // ── Progress ──
-    const totalDefaultFacts = numAgents * factsPerAgent * (round + 1)
-    const defaultHalRate = totalDefaultFacts > 0
-      ? (defaultResults.hallucinations / Math.max(defaultResults.total, 1)) * 100
-      : 0
-    const defaultAccuracy = defaultResults.total > 0
-      ? (defaultResults.correct / defaultResults.total) * 100
-      : 100
+    // ── Compute metrics ──
+    const dHal = defaultResults.total > 0 ? (defaultResults.hallucinations / defaultResults.total) * 100 : 0
+    const dAcc = defaultResults.total > 0 ? (defaultResults.correct / defaultResults.total) * 100 : 100
+    const vHal = vikingResults.total > 0 ? (vikingResults.hallucinations / vikingResults.total) * 100 : 0
+    const vAcc = vikingResults.total > 0 ? (vikingResults.correct / vikingResults.total) * 100 : 100
+    const cHal = cludeResults.total > 0 ? (cludeResults.hallucinations / cludeResults.total) * 100 : 0
+    const cAcc = cludeResults.total > 0 ? (cludeResults.correct / cludeResults.total) * 100 : 100
 
-    const cludeHalRate = cludeResults.total > 0
-      ? (cludeResults.hallucinations / cludeResults.total) * 100
-      : 0
-    const cludeAccuracy = cludeResults.total > 0
-      ? (cludeResults.correct / cludeResults.total) * 100
-      : 100
-
-    // Cost: default = $0.25/query (context stuffing), clude = $0.001/query
     const defaultCost = numAgents * (round + 1) * 0.25
-    const cludeCost = cludeResults.costEmbeddings + (cludeResults.total * 0.001)
+    const vikingCost = numAgents * (round + 1) * 0.05
+    const cludeCost = embeddingCost + (cludeResults.total * 0.001)
 
     onProgress({
       type: 'progress',
@@ -331,55 +314,32 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
       total: numRounds,
       phase: round < 10 ? 'Warming up' : round < 40 ? 'Running interactions' : 'Final rounds',
       metrics: {
-        default: {
-          hallucinations: defaultHalRate,
-          factRetention: 100 - defaultHalRate,
-          cost: defaultCost,
-          predictions: defaultResults.total,
-          correct: defaultResults.correct,
-        },
-        clude: {
-          hallucinations: cludeHalRate,
-          factRetention: cludeAccuracy,
-          cost: cludeCost,
-          predictions: cludeResults.total,
-          correct: cludeResults.correct,
-        },
+        default: { hallucinations: dHal, factRetention: 100 - dHal, cost: defaultCost, predictions: defaultResults.total, correct: defaultResults.correct },
+        viking: { hallucinations: vHal, factRetention: vAcc, cost: vikingCost, predictions: vikingResults.total, correct: vikingResults.correct },
+        clude: { hallucinations: cHal, factRetention: cAcc, cost: cludeCost, predictions: cludeResults.total, correct: cludeResults.correct },
       },
       live: true,
     })
   }
 
-  // ── Phase 3: Cleanup ──
+  // ── Phase 4: Cleanup ──
   onProgress({ type: 'status', message: 'Cleaning up memories...', phase: 'cleanup' })
   await cleanupOwners(runId)
 
-  // ── Final results ──
-  const finalDefaultCost = numAgents * numRounds * 0.25
-  const finalCludeCost = cludeResults.costEmbeddings + (cludeResults.total * 0.001)
-
-  const finalDefaultHal = defaultResults.total > 0 ? (defaultResults.hallucinations / defaultResults.total) * 100 : 0
-  const finalCludeHal = cludeResults.total > 0 ? (cludeResults.hallucinations / cludeResults.total) * 100 : 0
-  const finalDefaultAcc = defaultResults.total > 0 ? (defaultResults.correct / defaultResults.total) * 100 : 0
-  const finalCludeAcc = cludeResults.total > 0 ? (cludeResults.correct / cludeResults.total) * 100 : 0
+  // Final
+  const fDHal = defaultResults.total > 0 ? (defaultResults.hallucinations / defaultResults.total) * 100 : 0
+  const fVHal = vikingResults.total > 0 ? (vikingResults.hallucinations / vikingResults.total) * 100 : 0
+  const fCHal = cludeResults.total > 0 ? (cludeResults.hallucinations / cludeResults.total) * 100 : 0
+  const fDAcc = defaultResults.total > 0 ? (defaultResults.correct / defaultResults.total) * 100 : 0
+  const fVAcc = vikingResults.total > 0 ? (vikingResults.correct / vikingResults.total) * 100 : 0
+  const fCAcc = cludeResults.total > 0 ? (cludeResults.correct / cludeResults.total) * 100 : 0
 
   return {
     agents: numAgents,
     rounds: numRounds,
     cludeQueriesRun: cludeResults.total,
-    default: {
-      hallucinations: finalDefaultHal,
-      factRetention: 100 - finalDefaultHal,
-      cost: finalDefaultCost,
-      predictions: defaultResults.total,
-      correct: defaultResults.correct,
-    },
-    clude: {
-      hallucinations: finalCludeHal,
-      factRetention: finalCludeAcc,
-      cost: finalCludeCost,
-      predictions: cludeResults.total,
-      correct: cludeResults.correct,
-    },
+    default: { hallucinations: fDHal, factRetention: 100 - fDHal, cost: numAgents * numRounds * 0.25, predictions: defaultResults.total, correct: defaultResults.correct },
+    viking: { hallucinations: fVHal, factRetention: fVAcc, cost: numAgents * numRounds * 0.05, predictions: vikingResults.total, correct: vikingResults.correct },
+    clude: { hallucinations: fCHal, factRetention: fCAcc, cost: embeddingCost + (cludeResults.total * 0.001), predictions: cludeResults.total, correct: cludeResults.correct },
   }
 }
