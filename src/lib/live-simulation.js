@@ -165,62 +165,78 @@ Reply ONLY with one word: CORRECT, WRONG, or UNKNOWN.
 // ── Main Simulation ──────────────────────────────────────────
 
 export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProgress) {
-  const runId = `cmiro-${Date.now()}`
+  const runId = `cmiro-seed` // fixed prefix — reuse across runs
   const factsPerAgent = 10
 
   // ── Phase 1: PRE-EMBED EVERYTHING ──
-  onProgress({ type: 'status', message: 'Pre-embedding all facts and questions...', phase: 'embedding' })
+  onProgress({ type: 'status', message: 'Pre-embedding questions...', phase: 'embedding' })
 
-  // Collect unique texts: all facts + all questions (just 20+20 = 40 texts, one Voyage call)
   const factTexts = WORLD_FACTS.map(f => f.fact)
   const questionTexts = WORLD_FACTS.map(f => f.question)
   const allTexts = [...factTexts, ...questionTexts]
 
   const allEmbeddings = await embedBatch(allTexts, 128)
-  const factEmbeddings = allEmbeddings.slice(0, factTexts.length)    // index 0-19
-  const questionEmbeddings = allEmbeddings.slice(factTexts.length)   // index 20-39
+  const factEmbeddings = allEmbeddings.slice(0, factTexts.length)
+  const questionEmbeddings = allEmbeddings.slice(factTexts.length)
 
-  // Map fact text → embedding for fast lookup
   const factEmbMap = new Map()
   factTexts.forEach((t, i) => factEmbMap.set(t, factEmbeddings[i]))
   const questionEmbMap = new Map()
   questionTexts.forEach((t, i) => questionEmbMap.set(t, questionEmbeddings[i]))
 
-  onProgress({ type: 'status', message: `Embeddings cached (${allTexts.length} vectors). Seeding ${numAgents} agents...`, phase: 'seeding' })
+  // ── Phase 2: Check if agents already seeded ──
+  onProgress({ type: 'status', message: 'Checking for existing seed data...', phase: 'seeding' })
 
-  // ── Phase 2: Assign facts + store memories ──
+  const checkResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/memories?owner_wallet=like.${runId}-*&select=id&limit=1`,
+    { headers: HEADERS }
+  )
+  const existing = checkResp.ok ? await checkResp.json() : []
+
+  // Assign facts to agents (deterministic — same seed = same assignment)
   const agents = []
-  const allMemoriesToStore = []
-
   for (let i = 0; i < numAgents; i++) {
     const owner = `${runId}-${i}`
-    const indices = new Set()
-    while (indices.size < factsPerAgent) {
-      indices.add(Math.floor(Math.random() * WORLD_FACTS.length))
+    // Deterministic fact assignment using agent index as seed
+    const indices = []
+    for (let j = 0; j < factsPerAgent; j++) {
+      indices.push((i * 7 + j * 3) % WORLD_FACTS.length)
     }
-    const agentFacts = [...indices].map(idx => WORLD_FACTS[idx])
+    const uniqueIndices = [...new Set(indices)]
+    while (uniqueIndices.length < factsPerAgent) {
+      uniqueIndices.push((uniqueIndices.length * 11 + i) % WORLD_FACTS.length)
+    }
+    const agentFacts = uniqueIndices.slice(0, factsPerAgent).map(idx => WORLD_FACTS[idx])
     agents.push({ id: i, owner, facts: agentFacts })
-
-    for (const f of agentFacts) {
-      allMemoriesToStore.push({
-        content: f.fact,
-        summary: f.fact,
-        memory_type: 'semantic',
-        importance: 0.7,
-        owner_wallet: owner,
-        source: 'clude-miro',
-        tags: ['clude-miro', 'benchmark'],
-        embedding: factEmbMap.get(f.fact),
-      })
-    }
   }
 
-  onProgress({ type: 'status', message: `Storing ${allMemoriesToStore.length} memories...`, phase: 'storing' })
-  await storeMemories(allMemoriesToStore, (msg) => {
-    onProgress({ type: 'status', message: msg, phase: 'storing' })
-  })
+  if (existing.length > 0) {
+    onProgress({ type: 'status', message: `Found existing seed data. Skipping to simulation...`, phase: 'running' })
+  } else {
+    onProgress({ type: 'status', message: `Seeding ${numAgents} agents (${numAgents * factsPerAgent} memories)...`, phase: 'storing' })
 
-  onProgress({ type: 'status', message: 'Seeding complete. Running simulation...', phase: 'running' })
+    const allMemoriesToStore = []
+    for (const agent of agents) {
+      for (const f of agent.facts) {
+        allMemoriesToStore.push({
+          content: f.fact,
+          summary: f.fact,
+          memory_type: 'semantic',
+          importance: 0.7,
+          owner_wallet: agent.owner,
+          source: 'clude-miro',
+          tags: ['clude-miro', 'benchmark'],
+          embedding: factEmbMap.get(f.fact),
+        })
+      }
+    }
+
+    await storeMemories(allMemoriesToStore, (msg) => {
+      onProgress({ type: 'status', message: msg, phase: 'storing' })
+    })
+  }
+
+  onProgress({ type: 'status', message: 'Running simulation...', phase: 'running' })
 
   // ── Phase 3: Simulate rounds ──
   // Default + OpenViking = simulated degradation (no API calls)
@@ -326,9 +342,7 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
     })
   }
 
-  // ── Phase 4: Cleanup ──
-  onProgress({ type: 'status', message: 'Cleaning up memories...', phase: 'cleanup' })
-  await cleanupOwners(runId)
+  // No cleanup — seed data persists for instant reruns
 
   // Final
   const fDHal = defaultResults.total > 0 ? (defaultResults.hallucinations / defaultResults.total) * 100 : 0
