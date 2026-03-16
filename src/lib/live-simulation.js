@@ -310,8 +310,8 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
     const cHal = cludeResults.total > 0 ? (cludeResults.hallucinations / cludeResults.total) * 100 : 0
     const cAcc = cludeResults.total > 0 ? (cludeResults.correct / cludeResults.total) * 100 : 100
 
-    const defaultCost = numAgents * (round + 1) * 0.25
-    const vikingCost = numAgents * (round + 1) * 0.05
+    const defaultCost = numAgents * (round + 1) * 0.015
+    const vikingCost = numAgents * (round + 1) * 0.008
     const cludeCost = embeddingCost + (cludeResults.total * 0.001)
 
     onProgress({
@@ -344,8 +344,8 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
     agents: numAgents,
     rounds: numRounds,
     cludeQueriesRun: cludeResults.total,
-    default: { hallucinations: fDHal, factRetention: 100 - fDHal, cost: numAgents * numRounds * 0.25, predictions: defaultResults.total, correct: defaultResults.correct },
-    viking: { hallucinations: fVHal, factRetention: fVAcc, cost: numAgents * numRounds * 0.05, predictions: vikingResults.total, correct: vikingResults.correct },
+    default: { hallucinations: fDHal, factRetention: 100 - fDHal, cost: numAgents * numRounds * 0.015, predictions: defaultResults.total, correct: defaultResults.correct },
+    viking: { hallucinations: fVHal, factRetention: fVAcc, cost: numAgents * numRounds * 0.008, predictions: vikingResults.total, correct: vikingResults.correct },
     clude: { hallucinations: fCHal, factRetention: fCAcc, cost: embeddingCost + (cludeResults.total * 0.001), predictions: cludeResults.total, correct: cludeResults.correct },
   }
 }

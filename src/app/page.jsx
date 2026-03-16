@@ -108,8 +108,8 @@ export default function Home() {
             We benchmarked 1,000 to show what cognitive memory changes. The patterns hold at any scale.
           </p>
           <p className="text-[11px] text-muted/50 font-mono max-w-xl mb-6">
-            Cost basis: Context stuffing = 100K tokens/query at GPT-4o rates ($2.50/1M input tokens = $0.25/query).
-            OpenViking tiered loading ≈ 20K tokens/query ($0.05). Clude vector retrieval returns only relevant memories ($0.001).{' '}
+            Cost basis: Basic RAG = ~6K tokens/query at GPT-4o rates ($2.50/1M input = $0.015/query).
+            OpenViking tiered loading reduces context to ~3K tokens ($0.008). Clude returns only relevant memories via vector retrieval ($0.001).{' '}
             <a href="https://openai.com/api/pricing" target="_blank" rel="noopener" className="underline hover:text-dark">Source: OpenAI Pricing</a>
           </p>
 
@@ -216,7 +216,7 @@ export default function Home() {
                   <div className="w-1.5 h-8 rounded-full bg-sys-default" />
                   <div>
                     <h3 className="font-mono text-[11px] tracking-wider text-muted leading-none">BASELINE</h3>
-                    <p className="text-[10px] text-muted/60 mt-0.5">Context stuffing · $0.25/q</p>
+                    <p className="text-[10px] text-muted/60 mt-0.5">Basic RAG · $0.015/q</p>
                   </div>
                 </div>
                 <SimulationViz metrics={liveMetrics.default} color="#c4c4c4" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED' : 'COST'} />
@@ -231,7 +231,7 @@ export default function Home() {
                       <h3 className="font-mono text-[11px] tracking-wider text-sys-viking leading-none">OPENVIKING</h3>
                       <span className="text-[8px] font-mono text-sys-viking/60 border border-sys-viking/20 px-1 py-px rounded">BYTEDANCE</span>
                     </div>
-                    <p className="text-[10px] text-muted/60 mt-0.5">Filesystem tiers · $0.05/q</p>
+                    <p className="text-[10px] text-muted/60 mt-0.5">Filesystem tiers · $0.008/q</p>
                   </div>
                 </div>
                 <SimulationViz metrics={liveMetrics.viking} color="#e8a849" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED' : 'COST'} />

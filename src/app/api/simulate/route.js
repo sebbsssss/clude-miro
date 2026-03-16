@@ -260,10 +260,12 @@ export async function POST(request) {
         for (const agent of cludeAgents) agent.predict(questionIdx)
         for (const agent of vikingAgents) agent.predict(questionIdx)
 
-        // Compute metrics
-        // Default: $0.25/query (100K context), OpenViking: $0.05/query (tiered L0/L1/L2), Clude: $0.001/query
-        const defaultMetrics = computeMetrics(defaultAgents, round, 0.25)
-        const vikingMetrics = computeMetrics(vikingAgents, round, 0.05)
+        // Compute metrics — realistic costs per query
+        // Default (basic RAG): ~$0.015/query (5-10K context retrieval)
+        // OpenViking (tiered): ~$0.008/query (structured loading reduces tokens)
+        // Clude (vector retrieval): $0.001/query (returns only relevant memories)
+        const defaultMetrics = computeMetrics(defaultAgents, round, 0.015)
+        const vikingMetrics = computeMetrics(vikingAgents, round, 0.008)
         const cludeMetrics = computeMetrics(cludeAgents, round, 0.001)
 
         send({
@@ -283,8 +285,8 @@ export async function POST(request) {
       }
 
       // Final results
-      const finalDefault = computeMetrics(defaultAgents, NUM_ROUNDS - 1, 0.25)
-      const finalViking = computeMetrics(vikingAgents, NUM_ROUNDS - 1, 0.05)
+      const finalDefault = computeMetrics(defaultAgents, NUM_ROUNDS - 1, 0.015)
+      const finalViking = computeMetrics(vikingAgents, NUM_ROUNDS - 1, 0.008)
       const finalClude = computeMetrics(cludeAgents, NUM_ROUNDS - 1, 0.001)
 
       send({
