@@ -107,6 +107,11 @@ export default function Home() {
             MiroFish simulates hundreds of thousands of AI agents — Brian Roemmele just ran 500K.
             We benchmarked 1,000 to show what cognitive memory changes. The patterns hold at any scale.
           </p>
+          <p className="text-[11px] text-muted/50 font-mono max-w-xl mb-6">
+            Cost basis: Context stuffing = 100K tokens/query at GPT-4o rates ($2.50/1M input tokens = $0.25/query).
+            OpenViking tiered loading ≈ 20K tokens/query ($0.05). Clude vector retrieval returns only relevant memories ($0.001).{' '}
+            <a href="https://openai.com/api/pricing" target="_blank" rel="noopener" className="underline hover:text-dark">Source: OpenAI Pricing</a>
+          </p>
 
           {/* Mode toggle */}
           <div className="flex gap-2 mb-6">
