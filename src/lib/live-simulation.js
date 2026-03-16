@@ -234,7 +234,7 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
     const questionIdx = Math.floor(Math.random() * WORLD_FACTS.length)
     const { question, answer: expectedAnswer } = WORLD_FACTS[questionIdx]
 
-    // ── Default: heavy degradation ──
+    // ── Default: heavy degradation (only test agents that have the fact) ──
     for (const agent of defaultAgents) {
       const degradeRate = 0.02 + (round * 0.001)
       for (const idx of [...agent.intact]) {
@@ -243,16 +243,15 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
           agent.hallucinations++
         }
       }
-      const hasFact = agent.facts.some(f => f.answer === expectedAnswer)
-      if (hasFact) {
+      const factIdx = agent.facts.findIndex(f => f.answer === expectedAnswer)
+      if (factIdx !== -1) {
         defaultResults.total++
-        const factIdx = agent.facts.findIndex(f => f.answer === expectedAnswer)
         if (agent.intact.has(factIdx)) defaultResults.correct++
         else defaultResults.hallucinations++
       }
     }
 
-    // ── OpenViking: moderate degradation ──
+    // ── OpenViking: moderate degradation (only test agents that have the fact) ──
     for (const agent of vikingAgents) {
       const degradeRate = 0.008 + (round * 0.0003)
       for (const idx of [...agent.intact]) {
@@ -261,27 +260,24 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
           agent.hallucinations++
         }
       }
-      const hasFact = agent.facts.some(f => f.answer === expectedAnswer)
-      if (hasFact) {
+      const factIdx = agent.facts.findIndex(f => f.answer === expectedAnswer)
+      if (factIdx !== -1) {
         vikingResults.total++
-        const factIdx = agent.facts.findIndex(f => f.answer === expectedAnswer)
         if (agent.intact.has(factIdx)) vikingResults.correct++
         else vikingResults.hallucinations++
       }
     }
 
     // ── Clude: REAL recall with pre-computed embeddings ──
-    const sampleSize = Math.min(20, numAgents) // 20 agents per round, no embedding cost
-    const sampledIndices = new Set()
-    while (sampledIndices.size < sampleSize) {
-      sampledIndices.add(Math.floor(Math.random() * numAgents))
-    }
+    // Only query agents that HAVE the fact — measures recall quality, not random coverage
+    const agentsWithFact = agents.filter(a => a.facts.some(f => f.answer === expectedAnswer))
+    const sampleSize = Math.min(20, agentsWithFact.length)
+    const sampledAgents = agentsWithFact.sort(() => Math.random() - 0.5).slice(0, sampleSize)
 
     const qEmb = questionEmbMap.get(question) // pre-cached, no API call!
 
-    // Parallel recall for all sampled agents
-    const recallPromises = [...sampledIndices].map(async idx => {
-      const agent = agents[idx]
+    // Parallel recall for sampled agents (all have the fact)
+    const recallPromises = sampledAgents.map(async agent => {
       try {
         const matches = await recallMemories(qEmb, agent.owner, 5)
         const ids = matches.map(m => m.id)
