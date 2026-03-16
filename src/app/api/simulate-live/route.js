@@ -1,5 +1,7 @@
 import { runLiveSimulation } from '../../../lib/live-simulation'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 min timeout for Vercel
 
 export async function POST(request) {

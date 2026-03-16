@@ -174,6 +174,9 @@ function computeMetrics(agents, round, costPerQuery) {
   }
 }
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   const encoder = new TextEncoder()
 
