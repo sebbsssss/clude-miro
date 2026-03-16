@@ -14,7 +14,7 @@ export async function POST(request) {
       }
 
       try {
-        const results = await runLiveSimulation(1000, 50, send)
+        const results = await runLiveSimulation(100, 30, send)
         send({ type: 'complete', results })
       } catch (err) {
         send({ type: 'error', message: err.message })

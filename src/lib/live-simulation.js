@@ -64,8 +64,8 @@ async function embedBatch(texts, batchSize = 128) {
 
 // ── Supabase Ops ─────────────────────────────────────────────
 
-async function storeMemories(memories) {
-  const batchSize = 200
+async function storeMemories(memories, onProgress) {
+  const batchSize = 1000
   for (let i = 0; i < memories.length; i += batchSize) {
     const batch = memories.slice(i, i + batchSize)
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/memories`, {
@@ -77,7 +77,7 @@ async function storeMemories(memories) {
       const err = await resp.text()
       throw new Error(`Store error: ${resp.status} ${err}`)
     }
-    if (i + batchSize < memories.length) await sleep(50)
+    if (onProgress) onProgress(`Stored ${Math.min(i + batchSize, memories.length)}/${memories.length} memories...`)
   }
 }
 
@@ -216,7 +216,9 @@ export async function runLiveSimulation(numAgents = 1000, numRounds = 50, onProg
   }
 
   onProgress({ type: 'status', message: `Storing ${allMemoriesToStore.length} memories...`, phase: 'storing' })
-  await storeMemories(allMemoriesToStore)
+  await storeMemories(allMemoriesToStore, (msg) => {
+    onProgress({ type: 'status', message: msg, phase: 'storing' })
+  })
 
   onProgress({ type: 'status', message: 'Seeding complete. Running simulation...', phase: 'running' })
 

@@ -240,8 +240,8 @@ export default function Home() {
           {/* Quick stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 border-t border-gray-300 pt-8">
             {[
-              { label: 'Agents Benchmarked', value: '1,000' },
-              { label: 'Simulation Rounds', value: '50' },
+              { label: 'Agents Benchmarked', value: mode === 'live' ? '100' : '1,000' },
+              { label: 'Simulation Rounds', value: mode === 'live' ? '30' : '50' },
               { label: 'Facts Per Agent', value: '10' },
               { label: mode === 'live' ? 'Mode' : 'Clude Hallucination', value: mode === 'live' ? '🔴 PRODUCTION' : '1%' },
             ].map((stat) => (
@@ -264,25 +264,29 @@ export default function Home() {
           >
             {/* Progress bar */}
             {simRunning && (
-              <div className="mb-8 bg-white rounded-xl p-4 shadow-sm">
+              <div className="mb-8 bg-white rounded-xl p-4 border border-border">
                 <div className="flex justify-between items-center mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-clude rounded-full animate-pulse" />
-                    <span className="font-mono text-xs tracking-wider text-gray-500">
-                      ROUND {progress.round}/{progress.total}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {progress.phase}
-                    </span>
+                    {progress.round > 0 ? (
+                      <>
+                        <span className="font-mono text-xs tracking-wider text-muted">
+                          ROUND {progress.round}/{progress.total}
+                        </span>
+                        <span className="text-xs text-muted/60">{progress.phase}</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted">{statusMsg || 'Initializing...'}</span>
+                    )}
                   </div>
-                  <span className="font-mono text-sm font-bold text-clude">
-                    {Math.round((progress.round / progress.total) * 100)}%
+                  <span className="font-mono text-sm font-semibold text-clude">
+                    {progress.round > 0 ? `${Math.round((progress.round / progress.total) * 100)}%` : ''}
                   </span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                <div className="w-full bg-[#fafaf8] rounded-full h-1.5">
                   <motion.div
                     className="bg-gradient-to-r from-clude to-blue-400 h-1.5 rounded-full"
-                    animate={{ width: `${(progress.round / progress.total) * 100}%` }}
+                    animate={{ width: progress.round > 0 ? `${(progress.round / progress.total) * 100}%` : '5%' }}
                     transition={{ duration: 0.3 }}
                   />
                 </div>
