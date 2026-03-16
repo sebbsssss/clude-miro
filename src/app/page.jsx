@@ -7,9 +7,11 @@ import MetricsPanel from '../components/MetricsPanel'
 import ComparisonChart from '../components/ComparisonChart'
 
 export default function Home() {
+  const [mode, setMode] = useState('demo') // 'demo' or 'live'
   const [simRunning, setSimRunning] = useState(false)
   const [simComplete, setSimComplete] = useState(false)
   const [results, setResults] = useState(null)
+  const [statusMsg, setStatusMsg] = useState('')
   const [progress, setProgress] = useState({ round: 0, total: 50, phase: 'idle' })
   const [liveMetrics, setLiveMetrics] = useState({
     default: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
@@ -20,9 +22,12 @@ export default function Home() {
     setSimRunning(true)
     setSimComplete(false)
     setResults(null)
+    setStatusMsg('')
+
+    const endpoint = mode === 'live' ? '/api/simulate-live' : '/api/simulate'
 
     try {
-      const res = await fetch('/api/simulate', { method: 'POST' })
+      const res = await fetch(endpoint, { method: 'POST' })
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
 
@@ -35,9 +40,12 @@ export default function Home() {
         for (const line of lines) {
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.type === 'progress') {
+            if (data.type === 'status') {
+              setStatusMsg(data.message)
+            } else if (data.type === 'progress') {
               setProgress(data)
               setLiveMetrics(data.metrics)
+              setStatusMsg('')
             } else if (data.type === 'complete') {
               setResults(data.results)
               setSimComplete(true)
@@ -74,15 +82,40 @@ export default function Home() {
             prediction accuracy when those agents can actually remember? We ran the numbers.
           </p>
 
+          {/* Mode toggle */}
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => !simRunning && setMode('demo')}
+              className={`px-4 py-2 rounded-lg font-mono text-sm transition ${
+                mode === 'demo' ? 'bg-dark text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              }`}
+            >
+              Demo Mode (instant)
+            </button>
+            <button
+              onClick={() => !simRunning && setMode('live')}
+              className={`px-4 py-2 rounded-lg font-mono text-sm transition ${
+                mode === 'live' ? 'bg-clude text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              }`}
+            >
+              🔴 Live Mode (real Clude API)
+            </button>
+          </div>
+          {mode === 'live' && (
+            <p className="text-sm text-gray-500 mb-4">
+              Live mode stores real memories in Supabase, runs real vector recall, and uses Grok to judge answers. Takes ~30 min for 1,000 agents.
+            </p>
+          )}
+
           <div className="flex gap-4 mb-16">
             <motion.button
               onClick={startSimulation}
               disabled={simRunning}
-              className="bg-clude text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`${mode === 'live' ? 'bg-red-500 hover:bg-red-600' : 'bg-clude hover:bg-blue-600'} text-white px-8 py-4 rounded-lg font-semibold text-lg transition disabled:opacity-50 disabled:cursor-not-allowed`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {simRunning ? 'Simulation Running...' : simComplete ? 'Run Again' : 'Run Simulation →'}
+              {simRunning ? (statusMsg || 'Simulation Running...') : simComplete ? 'Run Again' : mode === 'live' ? '🔴 Run Live Simulation →' : 'Run Simulation →'}
             </motion.button>
             <a
               href="https://github.com/sebbsssss/clude-miro"
@@ -95,10 +128,10 @@ export default function Home() {
           {/* Quick stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 border-t border-gray-300 pt-8">
             {[
-              { label: 'Agents Simulated', value: '1,000' },
-              { label: 'Simulation Rounds', value: '50' },
+              { label: 'Agents', value: '1,000' },
+              { label: 'Rounds', value: '50' },
               { label: 'Facts Per Agent', value: '10' },
-              { label: 'Clude Hallucination Rate', value: '1%' },
+              { label: mode === 'live' ? 'Mode' : 'Clude Hallucination', value: mode === 'live' ? '🔴 LIVE' : '1%' },
             ].map((stat) => (
               <div key={stat.label}>
                 <p className="text-3xl font-bold">{stat.value}</p>
@@ -150,8 +183,13 @@ export default function Home() {
                 />
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-clude">
-                <h3 className="font-mono text-sm text-clude mb-1">CLUDE MEMORY</h3>
-                <p className="text-xs text-gray-400 mb-4">Cognitive memory retrieval</p>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-mono text-sm text-clude mb-1">CLUDE MEMORY</h3>
+                  {mode === 'live' && (
+                    <span className="bg-red-500 text-white text-xs font-mono px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mb-4">{mode === 'live' ? 'Real Supabase + Voyage + Grok' : 'Cognitive memory retrieval'}</p>
                 <SimulationViz
                   metrics={liveMetrics.clude}
                   color="#455cfa"
