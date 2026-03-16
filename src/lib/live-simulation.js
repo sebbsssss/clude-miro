@@ -10,7 +10,7 @@
  * - Real vector recall every round
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ilmkakcqakvwtfrsabrd.supabase.co'
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://okdregbvzsmjfkeobkzf.supabase.co'
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || ''
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY || ''
 const XAI_API_KEY = process.env.XAI_API_KEY || ''
