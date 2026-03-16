@@ -122,8 +122,49 @@ class CludeAgent {
 
   // Clude memory: much lower degradation due to vector retrieval + importance scoring
   degradeMemory(round) {
-    // 0.1-0.2% chance per fact (vs 2-5% for default) — 20x more stable
     const degradeRate = 0.001 + (round * 0.0001)
+    this.memories = this.memories.map((mem, i) => {
+      if (Math.random() < degradeRate && i < HALLUCINATED_FACTS.length) {
+        this.hallucinated++
+        return HALLUCINATED_FACTS[i]
+      }
+      return mem
+    })
+  }
+
+  factRetention() {
+    let retained = 0
+    for (let i = 0; i < this.facts.length; i++) {
+      if (this.memories[i] === this.facts[i]) retained++
+    }
+    return retained / this.facts.length
+  }
+
+  predict(questionIdx) {
+    this.totalPredictions++
+    if (this.memories[questionIdx] === this.facts[questionIdx]) {
+      this.correctPredictions++
+      return true
+    }
+    return false
+  }
+}
+
+class OpenVikingAgent {
+  constructor(id, facts) {
+    this.id = id
+    this.facts = [...facts]
+    this.memories = [...facts]
+    this.hallucinated = 0
+    this.correctPredictions = 0
+    this.totalPredictions = 0
+  }
+
+  // OpenViking: filesystem paradigm with L0/L1/L2 tiered context
+  // Better than raw context stuffing (structured), but still loads more context than needed
+  // ~0.8-1.5% degradation — better than default, worse than vector retrieval
+  degradeMemory(round) {
+    const degradeRate = 0.008 + (round * 0.0003)
     this.memories = this.memories.map((mem, i) => {
       if (Math.random() < degradeRate && i < HALLUCINATED_FACTS.length) {
         this.hallucinated++
@@ -189,9 +230,9 @@ export async function POST(request) {
       // Initialize agents
       const defaultAgents = []
       const cludeAgents = []
+      const vikingAgents = []
 
       for (let i = 0; i < NUM_AGENTS; i++) {
-        // Each agent gets a random subset of world facts
         const agentFacts = []
         const indices = new Set()
         while (indices.size < FACTS_PER_AGENT) {
@@ -203,6 +244,7 @@ export async function POST(request) {
 
         defaultAgents.push(new Agent(i, agentFacts))
         cludeAgents.push(new CludeAgent(i, agentFacts))
+        vikingAgents.push(new OpenVikingAgent(i, agentFacts))
       }
 
       // Run simulation
@@ -210,15 +252,18 @@ export async function POST(request) {
         // Degrade memories
         for (const agent of defaultAgents) agent.degradeMemory(round)
         for (const agent of cludeAgents) agent.degradeMemory(round)
+        for (const agent of vikingAgents) agent.degradeMemory(round)
 
         // Random prediction challenges
         const questionIdx = Math.floor(Math.random() * FACTS_PER_AGENT)
         for (const agent of defaultAgents) agent.predict(questionIdx)
         for (const agent of cludeAgents) agent.predict(questionIdx)
+        for (const agent of vikingAgents) agent.predict(questionIdx)
 
         // Compute metrics
-        // Default: $0.25/query (100K context), Clude: $0.001/query
+        // Default: $0.25/query (100K context), OpenViking: $0.05/query (tiered L0/L1/L2), Clude: $0.001/query
         const defaultMetrics = computeMetrics(defaultAgents, round, 0.25)
+        const vikingMetrics = computeMetrics(vikingAgents, round, 0.05)
         const cludeMetrics = computeMetrics(cludeAgents, round, 0.001)
 
         send({
@@ -228,6 +273,7 @@ export async function POST(request) {
           phase: round < 10 ? 'Warming up' : round < 40 ? 'Running interactions' : 'Final rounds',
           metrics: {
             default: defaultMetrics,
+            viking: vikingMetrics,
             clude: cludeMetrics,
           },
         })
@@ -238,12 +284,14 @@ export async function POST(request) {
 
       // Final results
       const finalDefault = computeMetrics(defaultAgents, NUM_ROUNDS - 1, 0.25)
+      const finalViking = computeMetrics(vikingAgents, NUM_ROUNDS - 1, 0.05)
       const finalClude = computeMetrics(cludeAgents, NUM_ROUNDS - 1, 0.001)
 
       send({
         type: 'complete',
         results: {
           default: finalDefault,
+          viking: finalViking,
           clude: finalClude,
           agents: NUM_AGENTS,
           rounds: NUM_ROUNDS,

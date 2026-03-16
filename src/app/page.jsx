@@ -15,6 +15,7 @@ export default function Home() {
   const [progress, setProgress] = useState({ round: 0, total: 50, phase: 'idle' })
   const [liveMetrics, setLiveMetrics] = useState({
     default: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
+    viking: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
     clude: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
   })
 
@@ -26,6 +27,7 @@ export default function Home() {
     setProgress({ round: 0, total: 50, phase: 'idle' })
     setLiveMetrics({
       default: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
+      viking: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
       clude: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
     })
 
@@ -184,14 +186,23 @@ export default function Home() {
               </div>
             )}
 
-            {/* Side by side visualization */}
-            <div className="grid md:grid-cols-2 gap-8 mb-12">
+            {/* Three-way comparison */}
+            <div className="grid md:grid-cols-3 gap-6 mb-12">
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h3 className="font-mono text-sm text-gray-500 mb-1">DEFAULT MEMORY</h3>
                 <p className="text-xs text-gray-400 mb-4">Context window stuffing</p>
                 <SimulationViz
                   metrics={liveMetrics.default}
                   color="#ef4444"
+                  running={simRunning}
+                />
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-300">
+                <h3 className="font-mono text-sm text-orange-500 mb-1">OPENVIKING</h3>
+                <p className="text-xs text-gray-400 mb-4">ByteDance filesystem paradigm</p>
+                <SimulationViz
+                  metrics={liveMetrics.viking}
+                  color="#f59e0b"
                   running={simRunning}
                 />
               </div>
@@ -214,6 +225,7 @@ export default function Home() {
             {/* Live metrics */}
             <MetricsPanel
               defaultMetrics={liveMetrics.default}
+              vikingMetrics={liveMetrics.viking}
               cludeMetrics={liveMetrics.clude}
               running={simRunning}
             />
