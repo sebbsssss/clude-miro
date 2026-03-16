@@ -6,6 +6,87 @@ import SimulationViz from '../components/SimulationViz'
 import MetricsPanel from '../components/MetricsPanel'
 import ComparisonChart from '../components/ComparisonChart'
 
+function downloadReport(results, mode) {
+  const d = results.default
+  const v = results.viking || { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 }
+  const c = results.clude
+  const predAccD = d.predictions > 0 ? (d.correct / d.predictions * 100).toFixed(1) : '0.0'
+  const predAccV = v.predictions > 0 ? (v.correct / v.predictions * 100).toFixed(1) : '0.0'
+  const predAccC = c.predictions > 0 ? (c.correct / c.predictions * 100).toFixed(1) : '0.0'
+  const timestamp = new Date().toISOString()
+  const costSavingsVsDefault = d.cost > 0 ? (d.cost / Math.max(c.cost, 0.01)).toFixed(0) : '—'
+  const costSavingsVsViking = v.cost > 0 ? (v.cost / Math.max(c.cost, 0.01)).toFixed(0) : '—'
+
+  const report = `# CludeMiro Benchmark Report
+Generated: ${timestamp}
+Mode: ${mode === 'live' ? 'Production (real Clude API)' : 'Simulation'}
+Agents: ${results.agents || 1000}
+Rounds: ${results.rounds || 50}
+${results.cludeQueriesRun ? `Production queries executed: ${results.cludeQueriesRun}` : ''}
+
+---
+
+## Results Summary
+
+| Metric | Baseline (RAG) | OpenViking | Clude |
+|--------|----------------|------------|-------|
+| Hallucination Rate | ${d.hallucinations.toFixed(2)}% | ${v.hallucinations.toFixed(2)}% | ${c.hallucinations.toFixed(2)}% |
+| Fact Retention | ${d.factRetention.toFixed(2)}% | ${v.factRetention.toFixed(2)}% | ${c.factRetention.toFixed(2)}% |
+| Prediction Accuracy | ${predAccD}% | ${predAccV}% | ${predAccC}% |
+| Total Cost | $${d.cost.toFixed(2)} | $${v.cost.toFixed(2)} | $${c.cost.toFixed(2)} |
+| Cost Per Query | $0.015 | $0.008 | $0.001 |
+
+## Key Findings
+
+- **Hallucination reduction**: Clude achieved ${c.hallucinations.toFixed(2)}% hallucination vs ${d.hallucinations.toFixed(2)}% baseline (${d.hallucinations > 0 ? (d.hallucinations / Math.max(c.hallucinations, 0.01)).toFixed(0) : '—'}x improvement)
+- **vs OpenViking**: ${v.hallucinations > 0 ? (v.hallucinations / Math.max(c.hallucinations, 0.01)).toFixed(0) : '—'}x less hallucination than ByteDance's filesystem approach
+- **Cost efficiency**: ${costSavingsVsDefault}x cheaper than baseline RAG, ${costSavingsVsViking}x cheaper than OpenViking
+- **Retention**: ${c.factRetention.toFixed(1)}% fact retention after ${results.rounds || 50} rounds
+
+## Methodology
+
+### Cost Basis
+- **Baseline (Basic RAG)**: ~6K tokens/query at GPT-4o rates ($2.50/1M input tokens = $0.015/query)
+- **OpenViking**: Tiered L0/L1/L2 loading reduces context to ~3K tokens ($0.008/query)
+- **Clude**: Cognitive vector retrieval returns only relevant memories ($0.001/query)
+- Source: https://openai.com/api/pricing
+
+### Simulation Design
+1. ${results.agents || 1000} agents seeded with 10 ground-truth facts each
+2. ${results.rounds || 50} rounds of interaction with memory degradation
+3. Each round: random fact queries, memory recall, accuracy measurement
+${mode === 'live' ? `4. Clude column uses real Supabase storage, Voyage-4-Large embeddings, and Grok-3 LLM judging` : '4. Degradation rates based on HaluMem benchmark data (arxiv.org/abs/2511.03506)'}
+
+### Memory Architectures
+- **Baseline**: Standard RAG — retrieve chunks by similarity, stuff into context window
+- **OpenViking**: ByteDance filesystem paradigm with L0/L1/L2 tiered context loading
+- **Clude**: Cognitive memory with vector retrieval, importance scoring, and Hebbian reinforcement
+
+## At Scale Projections
+
+| Scale | Baseline Cost/Round | OpenViking Cost/Round | Clude Cost/Round |
+|-------|--------------------|-----------------------|------------------|
+| 1K agents | $15 | $8 | $1 |
+| 100K agents | $1,500 | $800 | $100 |
+| 500K agents | $7,500 | $4,000 | $500 |
+| 750K agents | $11,250 | $6,000 | $750 |
+| 1M agents | $15,000 | $8,000 | $1,000 |
+
+---
+
+Benchmark: https://github.com/sebbsssss/clude-miro
+Clude: https://clude.io
+`
+
+  const blob = new Blob([report], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `cludemiro-report-${mode}-${new Date().toISOString().slice(0, 10)}.md`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function Home() {
   const [mode, setMode] = useState('demo') // 'demo' or 'live'
   const [simRunning, setSimRunning] = useState(false)
@@ -277,8 +358,16 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             className="max-w-6xl mx-auto px-6 pb-20"
           >
-            <h2 className="text-4xl font-bold mb-2">Results</h2>
-            <p className="text-gray-500 mb-10">After 50 rounds of simulation with 1,000 agents</p>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-4xl font-bold">Results</h2>
+              <button
+                onClick={() => downloadReport(results, mode)}
+                className="font-mono text-xs bg-dark text-white px-4 py-2 rounded-lg hover:bg-dark/80 transition"
+              >
+                ↓ Download Report
+              </button>
+            </div>
+            <p className="text-muted mb-10">After {results.rounds || 50} rounds of simulation with {results.agents || '1,000'} agents</p>
             <ComparisonChart results={results} />
           </motion.section>
         )}
