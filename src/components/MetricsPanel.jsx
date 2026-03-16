@@ -6,16 +6,16 @@ function MetricRow({ label, defaultVal, vikingVal, cludeVal, unit = '', highligh
   return (
     <div className={`grid grid-cols-5 gap-4 py-4 border-b border-gray-100 ${highlight ? 'bg-blue-50/50 -mx-4 px-4 rounded-lg' : ''}`}>
       <p className="font-mono text-sm text-gray-600">{label}</p>
-      <p className="text-lg font-bold text-red-500 text-center">
+      <p className="text-base font-semibold text-center tabular-nums" style={{ color: '#999' }}>
         {typeof defaultVal === 'number' ? defaultVal.toFixed(1) : defaultVal}{unit}
       </p>
-      <p className="text-lg font-bold text-orange-500 text-center">
+      <p className="text-base font-semibold text-center tabular-nums" style={{ color: '#e8a849' }}>
         {typeof vikingVal === 'number' ? vikingVal.toFixed(1) : vikingVal}{unit}
       </p>
-      <p className="text-lg font-bold text-clude text-center">
+      <p className="text-base font-semibold text-center tabular-nums" style={{ color: '#455cfa' }}>
         {typeof cludeVal === 'number' ? cludeVal.toFixed(1) : cludeVal}{unit}
       </p>
-      <p className="text-lg font-bold text-green-600 text-center">
+      <p className="text-base font-semibold text-center tabular-nums" style={{ color: '#111' }}>
         {defaultVal > 0 ? `${(defaultVal / Math.max(cludeVal, 0.01)).toFixed(0)}x` : '—'}
       </p>
     </div>
@@ -33,16 +33,16 @@ export default function MetricsPanel({ defaultMetrics, vikingMetrics, cludeMetri
 
   return (
     <motion.div
-      className="bg-white rounded-2xl p-8 shadow-sm"
+      className="bg-white rounded-xl p-8 border border-border"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <div className="grid grid-cols-5 gap-4 mb-4 pb-4 border-b-2 border-gray-200">
-        <p className="font-mono text-xs text-gray-500 tracking-wider">METRIC</p>
-        <p className="font-mono text-xs text-red-500 tracking-wider text-center">DEFAULT</p>
-        <p className="font-mono text-xs text-orange-500 tracking-wider text-center">OPENVIKING</p>
-        <p className="font-mono text-xs text-clude tracking-wider text-center">CLUDE</p>
-        <p className="font-mono text-xs text-green-600 tracking-wider text-center">vs DEFAULT</p>
+      <div className="grid grid-cols-5 gap-4 mb-4 pb-4 border-b border-border">
+        <p className="font-mono text-[10px] text-muted/50 tracking-widest">METRIC</p>
+        <p className="font-mono text-[10px] tracking-widest text-center" style={{ color: '#999' }}>BASELINE</p>
+        <p className="font-mono text-[10px] tracking-widest text-center" style={{ color: '#e8a849' }}>OPENVIKING</p>
+        <p className="font-mono text-[10px] tracking-widest text-center" style={{ color: '#455cfa' }}>CLUDE</p>
+        <p className="font-mono text-[10px] text-dark tracking-widest text-center">DELTA</p>
       </div>
 
       <MetricRow label="Hallucination Rate" defaultVal={d.hallucinations} vikingVal={v.hallucinations} cludeVal={c.hallucinations} unit="%" highlight />

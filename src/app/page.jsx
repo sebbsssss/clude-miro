@@ -98,15 +98,14 @@ export default function Home() {
           <p className="font-mono text-sm tracking-widest text-clude mb-6">
             — SWARM MEMORY BENCHMARK
           </p>
-          <h1 className="text-5xl md:text-7xl font-extrabold leading-tight mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold leading-[1.1] mb-6 tracking-tight">
             What happens when<br />
             swarm agents get<br />
-            <span className="text-clude">persistent memory?</span>
+            <span className="text-sys-clude">persistent memory?</span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mb-10">
+          <p className="text-lg text-muted max-w-xl mb-10 leading-relaxed">
             MiroFish simulates hundreds of thousands of AI agents — Brian Roemmele just ran 500K.
-            We benchmarked 1,000 agents to show what happens when you swap context stuffing
-            for cognitive memory. The patterns hold at any scale.
+            We benchmarked 1,000 to show what cognitive memory changes. The patterns hold at any scale.
           </p>
 
           {/* Mode toggle */}
@@ -114,7 +113,7 @@ export default function Home() {
             <button
               onClick={() => !simRunning && setMode('demo')}
               className={`px-4 py-2 rounded-lg font-mono text-sm transition ${
-                mode === 'demo' ? 'bg-dark text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                mode === 'demo' ? 'bg-dark text-white' : 'bg-[#fafaf8] text-muted border border-border hover:bg-white'
               }`}
             >
               Demo Mode (instant)
@@ -122,7 +121,7 @@ export default function Home() {
             <button
               onClick={() => !simRunning && setMode('live')}
               className={`px-4 py-2 rounded-lg font-mono text-sm transition ${
-                mode === 'live' ? 'bg-clude text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                mode === 'live' ? 'bg-sys-clude text-white' : 'bg-[#fafaf8] text-muted border border-border hover:bg-white'
               }`}
             >
               🔵 Production Mode (Clude API)
@@ -205,42 +204,51 @@ export default function Home() {
             )}
 
             {/* Three-way comparison */}
-            <div className="grid md:grid-cols-3 gap-5 mb-12">
+            <div className="grid md:grid-cols-3 gap-4 mb-12">
               {/* Default */}
-              <div className="bg-white rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-red-400" />
-                  <h3 className="font-mono text-xs tracking-wider text-gray-500">DEFAULT</h3>
+              <div className="bg-white rounded-xl p-5 border border-border">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-1.5 h-8 rounded-full bg-sys-default" />
+                  <div>
+                    <h3 className="font-mono text-[11px] tracking-wider text-muted leading-none">BASELINE</h3>
+                    <p className="text-[10px] text-muted/60 mt-0.5">Context stuffing · $0.25/q</p>
+                  </div>
                 </div>
-                <p className="text-[11px] text-gray-400 mb-4 ml-4">Context window stuffing · $0.25/query</p>
-                <SimulationViz metrics={liveMetrics.default} color="#ef4444" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED COST' : 'COST'} />
+                <SimulationViz metrics={liveMetrics.default} color="#c4c4c4" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED' : 'COST'} />
               </div>
 
               {/* OpenViking */}
-              <div className="bg-white rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow ring-1 ring-orange-200">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-amber-400" />
-                  <h3 className="font-mono text-xs tracking-wider text-orange-500">OPENVIKING</h3>
-                  <span className="text-[9px] font-mono bg-orange-50 text-orange-400 px-1.5 py-0.5 rounded">BYTEDANCE</span>
+              <div className="bg-white rounded-xl p-5 border border-sys-viking/30">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-1.5 h-8 rounded-full bg-sys-viking" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-mono text-[11px] tracking-wider text-sys-viking leading-none">OPENVIKING</h3>
+                      <span className="text-[8px] font-mono text-sys-viking/60 border border-sys-viking/20 px-1 py-px rounded">BYTEDANCE</span>
+                    </div>
+                    <p className="text-[10px] text-muted/60 mt-0.5">Filesystem tiers · $0.05/q</p>
+                  </div>
                 </div>
-                <p className="text-[11px] text-gray-400 mb-4 ml-4">Filesystem paradigm · $0.05/query</p>
-                <SimulationViz metrics={liveMetrics.viking} color="#f59e0b" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED COST' : 'COST'} />
+                <SimulationViz metrics={liveMetrics.viking} color="#e8a849" running={simRunning} costLabel={mode === 'live' ? 'PROJECTED' : 'COST'} />
               </div>
 
               {/* Clude */}
-              <div className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(69,92,250,0.1)] hover:shadow-[0_4px_16px_rgba(69,92,250,0.15)] transition-shadow ring-2 ring-clude/30">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-clude" />
-                    <h3 className="font-mono text-xs tracking-wider text-clude">CLUDE</h3>
-                    {mode === 'live' && (
-                      <span className="text-[9px] font-mono bg-clude text-white px-1.5 py-0.5 rounded-full animate-pulse">PRODUCTION</span>
-                    )}
+              <div className="bg-white rounded-xl p-5 border-2 border-sys-clude/20 shadow-[0_0_24px_rgba(69,92,250,0.06)]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1.5 h-8 rounded-full bg-sys-clude" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-mono text-[11px] tracking-wider text-sys-clude leading-none">CLUDE</h3>
+                        {mode === 'live' && (
+                          <span className="text-[8px] font-mono bg-sys-clude text-white px-1.5 py-px rounded animate-pulse">PRODUCTION</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted/60 mt-0.5">Vector retrieval · $0.001/q</p>
+                    </div>
                   </div>
-                  <span className="text-[9px] font-mono bg-blue-50 text-clude px-1.5 py-0.5 rounded">WINNER</span>
                 </div>
-                <p className="text-[11px] text-gray-400 mb-4 ml-4">Cognitive vector retrieval · $0.001/query</p>
-                <SimulationViz metrics={liveMetrics.clude} color="#455cfa" running={simRunning} costLabel={mode === 'live' ? 'ACTUAL COST' : 'COST'} />
+                <SimulationViz metrics={liveMetrics.clude} color="#455cfa" running={simRunning} costLabel={mode === 'live' ? 'ACTUAL' : 'COST'} />
               </div>
             </div>
 

@@ -6,9 +6,9 @@ export default function SimulationViz({ metrics, color, running, costLabel }) {
   const m = metrics || { hallucinations: 0, factRetention: 100, cost: 0 }
   const { hallucinations, factRetention, cost } = m
 
-  // Generate agent dots in a honeycomb-ish pattern
+  // Honeycomb dots
   const cols = 12
-  const rows = 8
+  const rows = 7
   const total = cols * rows
   const halCount = Math.floor((hallucinations / 100) * total)
 
@@ -16,58 +16,51 @@ export default function SimulationViz({ metrics, color, running, costLabel }) {
     const row = Math.floor(i / cols)
     const col = i % cols
     const offset = row % 2 === 0 ? 0 : 4
-    return {
-      id: i,
-      x: col * 8.3 + offset + 2,
-      y: row * 11 + 6,
-      hallucinating: i < halCount,
-    }
+    return { id: i, x: col * 8.3 + offset + 2, y: row * 12 + 8, bad: i < halCount }
   })
 
   return (
     <div>
-      {/* Agent visualization */}
-      <div className="rounded-xl overflow-hidden mb-5" style={{ background: `${color}08` }}>
-        <svg viewBox="0 0 100 96" className="w-full">
+      {/* Dot grid */}
+      <div className="rounded-lg overflow-hidden mb-4 bg-[#fafaf8]">
+        <svg viewBox="0 0 100 92" className="w-full">
           {dots.map((dot) => (
             <motion.circle
               key={dot.id}
               cx={dot.x}
               cy={dot.y}
-              r={running && dot.hallucinating ? 3 : 2.8}
-              fill={dot.hallucinating ? '#ef4444' : color}
-              opacity={dot.hallucinating ? 1 : 0.35}
+              r={2.5}
+              fill={dot.bad ? '#e5484d' : color}
+              opacity={dot.bad ? 0.9 : 0.2}
               animate={
-                running && dot.hallucinating
-                  ? { opacity: [1, 0.4, 1], r: [2.8, 3.5, 2.8] }
+                running && dot.bad
+                  ? { opacity: [0.9, 0.3, 0.9] }
                   : {}
               }
-              transition={{ duration: 1.5, repeat: Infinity, delay: dot.id * 0.01 }}
+              transition={{ duration: 2, repeat: Infinity, delay: dot.id * 0.015 }}
             />
           ))}
         </svg>
       </div>
 
-      {/* Metrics row */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl p-3 text-center" style={{ background: `${color}0a` }}>
-          <p className="text-[10px] font-mono tracking-wider text-gray-400 mb-1">HALLUCINATION</p>
-          <p className="text-xl font-bold" style={{ color: hallucinations > 3 ? '#ef4444' : color }}>
-            {hallucinations.toFixed(1)}%
+      {/* Metrics */}
+      <div className="grid grid-cols-3 gap-1.5">
+        <div className="bg-[#fafaf8] rounded-lg p-2.5 text-center">
+          <p className="text-[8px] font-mono tracking-widest text-muted/50 mb-1">HALLUC.</p>
+          <p className="text-lg font-semibold tabular-nums" style={{ color: hallucinations > 3 ? '#e5484d' : color }}>
+            {hallucinations.toFixed(1)}<span className="text-xs text-muted/40">%</span>
           </p>
         </div>
-        <div className="rounded-xl p-3 text-center" style={{ background: `${color}0a` }}>
-          <p className="text-[10px] font-mono tracking-wider text-gray-400 mb-1">RETENTION</p>
-          <p className="text-xl font-bold" style={{ color }}>
-            {factRetention.toFixed(1)}%
+        <div className="bg-[#fafaf8] rounded-lg p-2.5 text-center">
+          <p className="text-[8px] font-mono tracking-widest text-muted/50 mb-1">RETAIN</p>
+          <p className="text-lg font-semibold tabular-nums" style={{ color }}>
+            {factRetention.toFixed(1)}<span className="text-xs text-muted/40">%</span>
           </p>
         </div>
-        <div className="rounded-xl p-3 text-center" style={{ background: `${color}0a` }}>
-          <p className="text-[10px] font-mono tracking-wider text-gray-400 mb-1">
-            {costLabel || 'COST'}
-          </p>
-          <p className="text-xl font-bold" style={{ color }}>
-            {cost >= 1000 ? `$${(cost / 1000).toFixed(1)}K` : `$${cost.toFixed(0)}`}
+        <div className="bg-[#fafaf8] rounded-lg p-2.5 text-center">
+          <p className="text-[8px] font-mono tracking-widest text-muted/50 mb-1">{costLabel || 'COST'}</p>
+          <p className="text-lg font-semibold tabular-nums" style={{ color }}>
+            <span className="text-xs text-muted/40">$</span>{cost >= 1000 ? `${(cost / 1000).toFixed(1)}K` : cost.toFixed(0)}
           </p>
         </div>
       </div>
