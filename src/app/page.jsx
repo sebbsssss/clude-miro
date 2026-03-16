@@ -89,12 +89,13 @@ export default function Home() {
           </p>
           <h1 className="text-5xl md:text-7xl font-extrabold leading-tight mb-6">
             What happens when<br />
-            <span className="text-clude">500K agents</span> get<br />
-            real memory?
+            swarm agents get<br />
+            <span className="text-clude">persistent memory?</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mb-10">
-            MiroFish simulates hundreds of thousands of AI agents. But what happens to
-            prediction accuracy when those agents can actually remember? We ran the numbers.
+            MiroFish simulates hundreds of thousands of AI agents — Brian Roemmele just ran 500K.
+            We benchmarked 1,000 agents to show what happens when you swap context stuffing
+            for cognitive memory. The patterns hold at any scale.
           </p>
 
           {/* Mode toggle */}
@@ -113,12 +114,12 @@ export default function Home() {
                 mode === 'live' ? 'bg-clude text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
-              🔴 Live Mode (real Clude API)
+              🔵 Production Mode (Clude API)
             </button>
           </div>
           {mode === 'live' && (
             <p className="text-sm text-gray-500 mb-4">
-              Live mode stores real memories in Supabase, runs real vector recall, and uses Grok to judge answers. Takes ~30 min for 1,000 agents.
+              Production mode stores memories in Supabase, runs vector recall via Voyage embeddings, and uses Grok to judge answers. Takes ~30 min for 1,000 agents.
             </p>
           )}
 
@@ -130,7 +131,7 @@ export default function Home() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {simRunning ? (statusMsg || 'Simulation Running...') : simComplete ? 'Run Again' : mode === 'live' ? '🔴 Run Live Simulation →' : 'Run Simulation →'}
+              {simRunning ? (statusMsg || 'Simulation Running...') : simComplete ? 'Run Again' : mode === 'live' ? '🔵 Run Production Simulation →' : 'Run Simulation →'}
             </motion.button>
             <a
               href="https://github.com/sebbsssss/clude-miro"
@@ -143,10 +144,10 @@ export default function Home() {
           {/* Quick stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 border-t border-gray-300 pt-8">
             {[
-              { label: 'Agents', value: '1,000' },
-              { label: 'Rounds', value: '50' },
+              { label: 'Agents Benchmarked', value: '1,000' },
+              { label: 'Simulation Rounds', value: '50' },
               { label: 'Facts Per Agent', value: '10' },
-              { label: mode === 'live' ? 'Mode' : 'Clude Hallucination', value: mode === 'live' ? '🔴 LIVE' : '1%' },
+              { label: mode === 'live' ? 'Mode' : 'Clude Hallucination', value: mode === 'live' ? '🔴 PRODUCTION' : '1%' },
             ].map((stat) => (
               <div key={stat.label}>
                 <p className="text-3xl font-bold">{stat.value}</p>
@@ -222,7 +223,7 @@ export default function Home() {
                     <div className="w-2 h-2 rounded-full bg-clude" />
                     <h3 className="font-mono text-xs tracking-wider text-clude">CLUDE</h3>
                     {mode === 'live' && (
-                      <span className="text-[9px] font-mono bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">LIVE</span>
+                      <span className="text-[9px] font-mono bg-clude text-white px-1.5 py-0.5 rounded-full animate-pulse">PRODUCTION</span>
                     )}
                   </div>
                   <span className="text-[9px] font-mono bg-blue-50 text-clude px-1.5 py-0.5 rounded">WINNER</span>
