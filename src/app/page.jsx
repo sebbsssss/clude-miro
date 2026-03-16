@@ -23,6 +23,11 @@ export default function Home() {
     setSimComplete(false)
     setResults(null)
     setStatusMsg('')
+    setProgress({ round: 0, total: 50, phase: 'idle' })
+    setLiveMetrics({
+      default: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
+      clude: { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 },
+    })
 
     const endpoint = mode === 'live' ? '/api/simulate-live' : '/api/simulate'
 
