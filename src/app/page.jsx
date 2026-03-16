@@ -59,10 +59,21 @@ export default function Home() {
               setStatusMsg(data.message)
             } else if (data.type === 'progress') {
               setProgress(data)
-              setLiveMetrics(data.metrics)
+              const emptyMetrics = { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 }
+              setLiveMetrics({
+                default: data.metrics.default || emptyMetrics,
+                viking: data.metrics.viking || emptyMetrics,
+                clude: data.metrics.clude || emptyMetrics,
+              })
               setStatusMsg('')
             } else if (data.type === 'complete') {
-              setResults(data.results)
+              const emptyR = { hallucinations: 0, factRetention: 100, cost: 0, predictions: 0, correct: 0 }
+              setResults({
+                ...data.results,
+                default: data.results.default || emptyR,
+                viking: data.results.viking || emptyR,
+                clude: data.results.clude || emptyR,
+              })
               setSimComplete(true)
               setSimRunning(false)
             }

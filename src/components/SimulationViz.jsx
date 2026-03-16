@@ -3,7 +3,8 @@
 import { motion } from 'framer-motion'
 
 export default function SimulationViz({ metrics, color, running }) {
-  const { hallucinations, factRetention, cost } = metrics
+  const m = metrics || { hallucinations: 0, factRetention: 100, cost: 0 }
+  const { hallucinations, factRetention, cost } = m
 
   // Generate agent dots in a honeycomb-ish pattern
   const cols = 12
